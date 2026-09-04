@@ -12,6 +12,7 @@
   "scripts": {
     "postinstall": "wxt prepare",
     "icons:generate": "node scripts/run-commands.mjs icons-generate node scripts/generate-icons.mjs",
+    "compatibility:injection": "node scripts/run-commands.mjs compatibility-injection node scripts/check-injection-compatibility.mjs",
     "dev": "node scripts/run-commands.mjs dev node scripts/generate-icons.mjs ::: wxt",
     "dev:firefox": "node scripts/run-commands.mjs dev-firefox node scripts/generate-icons.mjs ::: wxt -b firefox",
     "build": "node scripts/run-commands.mjs build node scripts/generate-icons.mjs ::: wxt build",
