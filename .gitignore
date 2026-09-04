@@ -1,0 +1,12 @@
+node_modules/
+.wxt/
+.output/
+coverage/
+playwright-report/
+test-results/
+*.zip
+SHA256SUMS
+.env*
+!.env.example
+.DS_Store
+*.log
