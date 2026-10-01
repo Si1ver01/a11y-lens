@@ -80,6 +80,17 @@ describe('messaging schema', () => {
       }),
     ).toMatchObject({ ok: false, error: { code: 'INVALID_MESSAGE' } });
   });
+
+  it('accepts partial aggregate status without exposing findings', () => {
+    expect(
+      parseResponseMessage({
+        ...IDLE_STATUS,
+        state: 'partial',
+        categoryCounts: { ...EMPTY_COUNTS, contrast: 1 },
+        totalCount: 1,
+      }),
+    ).toMatchObject({ ok: true, value: { state: 'partial', totalCount: 1 } });
+  });
 });
 
 describe('messaging boundaries', () => {

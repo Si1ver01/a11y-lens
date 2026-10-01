@@ -23,6 +23,7 @@ async function assertFile(filePath, label) {
   } catch (error) {
     throw new Error(
       `${label} is missing or invalid: ${error instanceof Error ? error.message : 'unknown error'}`,
+      { cause: error },
     );
   }
 }

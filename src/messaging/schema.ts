@@ -13,7 +13,7 @@ export const AUDIT_CATEGORIES = [
 ] as const;
 
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
-export type AuditState = 'idle' | 'running' | 'complete' | 'error';
+export type AuditState = 'idle' | 'running' | 'complete' | 'partial' | 'error';
 export type MessageValidationErrorCode =
   'INVALID_MESSAGE' | 'MESSAGE_TOO_LARGE' | 'VERSION_UNSUPPORTED';
 export type AuditErrorCode =
@@ -70,7 +70,7 @@ export type MessageValidationResult<T> =
   | { readonly ok: false; readonly error: MessageValidationError };
 
 const CATEGORY_SET = new Set<string>(AUDIT_CATEGORIES);
-const AUDIT_STATES = new Set<AuditState>(['idle', 'running', 'complete', 'error']);
+const AUDIT_STATES = new Set<AuditState>(['idle', 'running', 'complete', 'partial', 'error']);
 const AUDIT_ERROR_CODES = new Set<AuditErrorCode>([
   'INVALID_MESSAGE',
   'MESSAGE_TOO_LARGE',
