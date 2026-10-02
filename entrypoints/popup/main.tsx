@@ -1,16 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
+import { App } from './App';
 import './style.css';
-
-export function PopupFoundation() {
-  return (
-    <main className="popup-foundation">
-      <h1>a11y-lens</h1>
-      <p>Accessibility audit is ready.</p>
-    </main>
-  );
-}
 
 const root = document.querySelector('#root');
 
@@ -20,6 +12,6 @@ if (!(root instanceof HTMLElement)) {
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <PopupFoundation />
+    <App />
   </React.StrictMode>,
 );
