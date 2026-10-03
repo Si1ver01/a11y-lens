@@ -1,59 +1,74 @@
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
-const webExtVersion = packageJson.devDependencies?.['web-ext'];
+const COUNT_KEYS = ['info', 'low', 'moderate', 'high', 'critical', 'total'];
 
-console.log('[FIX:security-gates] Checking production dependencies and web-ext baseline.');
+export function validateAuditResult({ stdout, status, error }) {
+  if (error) throw new Error('Не удалось запустить npm audit.', { cause: error });
 
-function fail(message) {
-  console.error(`[SECURITY] ${message}`);
-  process.exitCode = 1;
-}
-
-function parseAuditOutput(output) {
+  let report;
   try {
-    return JSON.parse(output);
-  } catch {
-    fail('npm audit returned non-JSON output. Check registry connectivity and npm version.');
-    return undefined;
+    report = JSON.parse(String(stdout));
+  } catch (cause) {
+    throw new Error('npm audit не вернул JSON-отчёт.', { cause });
   }
-}
 
-if (webExtVersion !== '10.6.0') {
-  fail(`web-ext must stay on the patched 10.6.0 line; found ${String(webExtVersion)}.`);
-}
-
-try {
-  const output = execFileSync(
-    process.platform === 'win32' ? 'npm.cmd' : 'npm',
-    ['audit', '--omit=dev', '--audit-level=high', '--json'],
-    { cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-  );
-  const report = parseAuditOutput(output);
-  const high = report?.metadata?.vulnerabilities?.high ?? 0;
-  const critical = report?.metadata?.vulnerabilities?.critical ?? 0;
-  if (report && high + critical > 0) {
-    fail('Production dependencies contain high or critical vulnerabilities.');
+  const counts = report?.metadata?.vulnerabilities;
+  if (
+    !report ||
+    Object.hasOwn(report, 'error') ||
+    !counts ||
+    !COUNT_KEYS.every((key) => Number.isSafeInteger(counts[key]) && counts[key] >= 0)
+  ) {
+    throw new Error('Отчёт npm audit неполный или содержит ошибку. Проверьте доступ к registry.');
   }
-} catch (error) {
-  const output = error?.stdout?.toString() ?? '';
-  const report = output ? parseAuditOutput(output) : undefined;
-  const high = report?.metadata?.vulnerabilities?.high ?? 0;
-  const critical = report?.metadata?.vulnerabilities?.critical ?? 0;
-  if (high + critical > 0) {
-    fail(
-      `Production dependency audit found ${high} high and ${critical} critical vulnerabilities.`,
+  const total = COUNT_KEYS.slice(0, -1).reduce((sum, key) => sum + counts[key], 0);
+  if (total !== counts.total) throw new Error('Счётчики npm audit не согласованы.');
+  if (total > 0) {
+    throw new Error(
+      `Найдены уязвимости: ${counts.low} low, ${counts.moderate} moderate, ` +
+        `${counts.high} high, ${counts.critical} critical, ${counts.info} info.`,
     );
-  } else if (!report) {
-    fail('Production dependency audit could not complete.');
+  }
+  if (status !== 0) throw new Error('npm audit завершился с ошибкой, проверка не пройдена.');
+  return counts;
+}
+
+export function checkDependencySecurity({ run = spawnSync, logger = console } = {}) {
+  logger.log('[FIX:security-gates] Проверяем все зависимости, включая devDependencies.');
+  try {
+    const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+    const webExtVersion = packageJson.devDependencies?.['web-ext'];
+    if (webExtVersion !== '10.7.0') {
+      throw new Error(`Ожидается web-ext@10.7.0; обнаружено ${String(webExtVersion)}.`);
+    }
+
+    validateAuditResult(
+      run(
+        process.platform === 'win32' ? 'npm.cmd' : 'npm',
+        [
+          'audit',
+          '--include=dev',
+          '--include=optional',
+          '--include=peer',
+          '--audit-level=low',
+          '--json',
+        ],
+        { cwd: projectRoot, encoding: 'utf8', timeout: 60_000 },
+      ),
+    );
+    logger.log('[SECURITY] Полный audit зависимостей пройден: уязвимостей нет.');
+    logger.log('[FIX:security-gates] Проверка завершена.');
+    return 0;
+  } catch (error) {
+    logger.error(`[SECURITY] ${error instanceof Error ? error.message : 'Проверка не выполнена.'}`);
+    return 1;
   }
 }
 
-if (process.exitCode !== 1) {
-  console.log('[SECURITY] Production dependency audit passed.');
-  console.log('[FIX:security-gates] Dependency security gate completed.');
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  process.exitCode = checkDependencySecurity();
 }
